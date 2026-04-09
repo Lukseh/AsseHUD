@@ -2,7 +2,6 @@ import { createApp } from 'vue'
 import '@mdi/font/css/materialdesignicons.css'
 import './style.css'
 import App from './App.vue'
-import { VueQueryPlugin } from "@tanstack/vue-query";
 
 import 'vuetify/styles'
 import { createVuetify } from 'vuetify'
@@ -14,4 +13,4 @@ const vuetify = createVuetify({
   directives,
 })
 
-createApp(App).use(vuetify).use(VueQueryPlugin).mount('#app')
+createApp(App).use(vuetify).mount('#app')

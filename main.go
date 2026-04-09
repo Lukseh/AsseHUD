@@ -16,6 +16,7 @@ import (
 
 	"github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/static"
 )
@@ -210,9 +211,10 @@ type ServerConfig struct {
 	PollingInterval int    `json:"polling_interval_ms"`
 }
 type FrontendConfig struct {
-	DefaultIcon bool `json:"default_icon"`
-	DefaultText bool `json:"default_text"`
-	WheelAngle  int  `json:"wheel_max_angle"`
+	DefaultIcon   bool `json:"default_icon"`
+	DefaultText   bool `json:"default_text"`
+	WheelAngle    int  `json:"wheel_max_angle"`
+	GraphDuration int  `json:"graph_duration"`
 }
 type Config struct {
 	Server   ServerConfig   `json:"server"`
@@ -245,9 +247,10 @@ func main() {
 			PollingInterval: 30,
 		},
 		Frontend: FrontendConfig{
-			DefaultIcon: true,
-			DefaultText: true,
-			WheelAngle:  900,
+			DefaultIcon:   true,
+			DefaultText:   true,
+			WheelAngle:    900,
+			GraphDuration: 5,
 		},
 	}
 	if len(rawF) == 0 {
@@ -281,6 +284,7 @@ func main() {
 	store := &Store{}
 	go poll(store, time.Duration(cfg.Server.PollingInterval)*time.Millisecond)
 	app := fiber.New()
+	app.Use(cors.New(cors.Config{AllowOrigins: []string{"*"}}))
 	app.Use(logger.New(logger.Config{
 		Skip: func(c fiber.Ctx) bool {
 			if cfg.Server.LogLevel == "none" {
@@ -295,7 +299,9 @@ func main() {
 		}
 		return fiber.ErrUpgradeRequired
 	})
-	app.Get("/config.json", func(c fiber.Ctx) error { return c.JSON(cfg.Frontend) })
+	app.Get("/config.json", func(c fiber.Ctx) error {
+		return c.JSON(fiber.Map{"page": cfg.Frontend, "polling_rate": cfg.Server.PollingInterval})
+	})
 	ws := app.Group("/ws")
 	ws.Get("/physics", websocket.New(wsHandler(store, func(gs GameState) *SPageFilePhysics { return gs.Physics }, time.Duration(cfg.Server.PollingInterval)*time.Millisecond)))
 	ws.Get("/graphics", websocket.New(wsHandler(store, func(gs GameState) *SPageFileGraphics { return gs.Graphics }, time.Duration(cfg.Server.PollingInterval)*time.Millisecond)))
@@ -309,6 +315,8 @@ func main() {
 		IndexNames: []string{"index.html"},
 		Browse:     true,
 	}))
+	c, _ := json.MarshalIndent(cfg, "", "  ")
+	log.Println(string(c))
 	log.Printf("Your app is working on http://%s:%d/\n", cfg.Server.Host, cfg.Server.Port)
 	log.Fatalln(app.Listen(fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port), fiber.ListenConfig{DisableStartupMessage: true}))
 }

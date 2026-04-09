@@ -36,14 +36,12 @@ export default defineComponent({
   },
   setup(props) {
     const rotateStyle = computed(() => {
-      const clamped = Math.max(-1, Math.min(1, props.value ?? 0));
-      const deg = clamped * ((props.maxangle ?? 900) * 2);
+      const deg = props.value * (props.maxangle / 2);
       return {
         transform: `rotate(${deg}deg)`,
         transition: "transform 0.1s ease",
       };
     });
-
     return {
       rotateStyle,
     };

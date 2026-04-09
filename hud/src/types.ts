@@ -1,7 +1,12 @@
+export interface PageConfig {
+  default_icon: boolean;
+  default_text: boolean;
+  wheel_max_angle: number;
+  graph_duration: number;
+}
 export interface AppConfig {
-  default_icon: boolean
-  default_text: boolean
-  wheel_max_angle: number
+  polling_interval_ms: number;
+  page: PageConfig;
 }
 export interface StaticData {
   sm_version: number[]

@@ -2,28 +2,52 @@
 import { useWebSocket } from "@vueuse/core";
 import { computed, ref, onMounted } from "vue";
 import WheelCard from "./components/WheelCard.vue";
+import GraphCard from "./components/GraphCard.vue";
 import type { PhysicsData, StaticData, AppConfig } from "./types";
 
-const cfg = ref<AppConfig>();
-onMounted(async () => {
-  cfg.value = await fetch("/config.json").then((r) => r.json());
-});
-
-onMounted(() => {
-  const params = new URLSearchParams(window.location.search);
-  element.value = params.get("element") ?? undefined;
-  text.value = params.get("text") === "false" ? false : true;
-  icon.value = params.get("icon") === "false" ? false : true;
-});
+const cfg = ref<AppConfig | null>(null);
 const element = ref<string | undefined>(undefined);
-const text = ref<boolean | undefined>(cfg?.value?.default_icon);
-const icon = ref<boolean | undefined>(cfg?.value?.default_icon);
+const text = ref<boolean>(true);
+const icon = ref<boolean>(true);
 const all = computed(() => !element.value);
 
-const elements = ref<string[]>();
+const elements = computed<string[]>(() =>
+  element.value ? element.value.split(";") : [],
+);
 
-onMounted(() => {
-  elements.value = element?.value?.split(";");
+onMounted(async () => {
+  const params = new URLSearchParams(window.location.search);
+  element.value = params.get("element") ?? undefined;
+
+  const textParam = params.get("text");
+  if (textParam !== null) {
+    text.value = textParam !== "false";
+  }
+
+  const iconParam = params.get("icon");
+  if (iconParam !== null) {
+    icon.value = iconParam !== "false";
+  }
+
+  try {
+    const response = await fetch("/config.json");
+    if (!response.ok) {
+      throw new Error(
+        `fetch /config.json failed: ${response.status} ${response.statusText}`,
+      );
+    }
+    const data = (await response.json()) as AppConfig;
+    cfg.value = data;
+
+    if (textParam === null) {
+      text.value = cfg.value.page.default_text;
+    }
+    if (iconParam === null) {
+      icon.value = cfg.value.page.default_icon;
+    }
+  } catch (e) {
+    console.error("Config load failed:", e);
+  }
 });
 
 // STATIC
@@ -98,8 +122,8 @@ const physics = computed<PhysicsData | null>(() => {
         <span v-if="icon" class="mdi mdi-steering" /><span>Steering</span>
       </div>
       <wheel-card
-        :value="physics?.steering"
-        :maxangle="cfg?.wheel_max_angle"
+        :value="physics?.steering ?? 0"
+        :maxangle="cfg?.page.wheel_max_angle"
         size="150"
         bg="https://q4v8e3e5.rocketcdn.me/app/uploads/sites/5/2024/03/ST-FPE-1-1000x1000.png"
       />
@@ -139,6 +163,35 @@ const physics = computed<PhysicsData | null>(() => {
               : (physics?.gear ?? 0) - 1
         }}
       </div>
+    </div>
+    <div v-if="all || elements?.includes('brakegraph')">
+      <span v-if="icon" class="mdi mdi-alert-circle-outline" /><span v-if="text"
+        >Brake Graph</span
+      >
+      <GraphCard
+        color="red"
+        :max_values="
+          ((cfg?.page.graph_duration ?? 5) * 1000) /
+          (cfg?.polling_interval_ms ?? 30)
+        "
+        :value="physics?.brake"
+        :poll="cfg?.polling_interval_ms"
+        class="transition-none"
+      />
+    </div>
+    <div v-if="all || elements?.includes('gasgraph')">
+      <span v-if="icon" class="mdi mdi-speedometer" /><span v-if="text"
+        >Gas Graph</span
+      >
+      <GraphCard
+        color="green"
+        :max_values="
+          ((cfg?.page.graph_duration ?? 5) * 1000) /
+          (cfg?.polling_interval_ms ?? 30)
+        "
+        :value="physics?.gas"
+        :poll="cfg?.polling_interval_ms"
+      />
     </div>
   </div>
 </template>
